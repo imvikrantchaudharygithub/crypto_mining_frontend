@@ -24,6 +24,21 @@ function useReveal(ref: React.RefObject<HTMLElement | null>, trigger: unknown = 
 
 const fmtINR = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN')
 
+type PublicStockStatus = 'In Stock' | 'Sold Out' | 'Coming Soon'
+
+function statusOf(p: Pick<Product, 'computedStatus' | 'available'>): PublicStockStatus {
+  if (p?.computedStatus === 'In Stock' || p?.computedStatus === 'Sold Out' || p?.computedStatus === 'Coming Soon') {
+    return p.computedStatus
+  }
+  return p?.available ? 'In Stock' : 'Coming Soon'
+}
+
+function badgeText(s: PublicStockStatus): string {
+  if (s === 'In Stock')  return 'In Stock — Ships in 48h'
+  if (s === 'Sold Out')  return 'Sold Out — Restock alerts coming'
+  return                        'Coming Soon — Notify Me'
+}
+
 /* ── section tag ────────────────────────────────────────── */
 function ProdTag({ num, label }: { num: string; label: string }) {
   return (
@@ -116,22 +131,24 @@ function ProductHero({ p }: { p: Product }) {
               </em>
             </h1>
 
+            {(() => { const _s = statusOf(p); const _live = _s === 'In Stock'; return (
             <div className="reveal" style={{
               display: 'inline-flex', alignItems: 'center', gap: 12,
               padding: '10px 16px 10px 14px',
-              background: p.available ? 'var(--mint-100)' : 'rgba(10,22,40,0.06)',
-              border: `1px solid ${p.available ? 'var(--mint-300)' : 'rgba(10,22,40,0.15)'}`,
+              background: _live ? 'var(--mint-100)' : 'rgba(10,22,40,0.06)',
+              border: `1px solid ${_live ? 'var(--mint-300)' : 'rgba(10,22,40,0.15)'}`,
               borderRadius: 999, marginBottom: 28,
             }}>
-              <PulseDot color={p.available ? 'var(--mint-500)' : 'var(--navy-300)'} />
+              <PulseDot color={_live ? 'var(--mint-500)' : 'var(--navy-300)'} />
               <span style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11,
                 letterSpacing: '0.1em', textTransform: 'uppercase',
                 color: 'var(--navy-900)', fontWeight: 600,
               }}>
-                {p.available ? 'In Stock — Ships in 48h' : 'Coming Soon — Notify Me'}
+                {badgeText(_s)}
               </span>
             </div>
+            )})()}
 
             <p className="reveal" style={{
               fontFamily: 'var(--font-mono)',
@@ -591,7 +608,7 @@ function BuyBox({ p }: { p: Product }) {
           }}>
             <PulseDot color="var(--mint-400)" size={8} />
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mint-300)', fontWeight: 500 }}>
-              {p.available ? 'In Stock — Ships in 48h' : 'Coming Soon'}
+              {badgeText(statusOf(p))}
             </span>
           </div>
 
@@ -608,8 +625,8 @@ function BuyBox({ p }: { p: Product }) {
 
           <div style={{ height: 1, background: 'rgba(251,251,243,0.12)', margin: '24px 0' }} />
 
-          {/* Duration */}
-          <div style={{ marginBottom: 22 }}>
+          {/* Duration — hidden for now */}
+          {/* <div style={{ marginBottom: 22 }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(251,251,243,0.55)', marginBottom: 12 }}>━ Contract</div>
             <div style={{ display: 'flex', gap: 6 }}>
               {[6, 12, 24].map(d => (
@@ -623,7 +640,7 @@ function BuyBox({ p }: { p: Product }) {
                 }}>{d} mo</button>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* Silencer add-on */}
           {p.silencerPrice > 0 && (
@@ -653,31 +670,42 @@ function BuyBox({ p }: { p: Product }) {
           )}
 
           {/* CTAs */}
-          <button style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            padding: '19px 24px', background: 'var(--mint-400)', color: 'var(--navy-900)',
-            border: 'none', borderRadius: 999,
-            fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700,
-            cursor: 'pointer', marginBottom: 10, transition: 'transform 0.25s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
-          onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--navy-900)' }} />
-            {p.available ? 'Buy Contract →' : 'Notify Me →'}
+          {(() => {
+            const _s = statusOf(p)
+            const _soldOut = _s === 'Sold Out'
+            const _ctaLabel = _s === 'In Stock' ? 'Buy Mining →' : _s === 'Sold Out' ? 'Sold Out' : 'Notify Me →'
+            return (
+          <button
+            disabled={_soldOut}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '19px 24px',
+              background: _soldOut ? 'rgba(168,224,99,0.2)' : 'var(--mint-400)',
+              color: _soldOut ? 'rgba(251,251,243,0.45)' : 'var(--navy-900)',
+              border: 'none', borderRadius: 999,
+              fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700,
+              cursor: _soldOut ? 'not-allowed' : 'pointer', marginBottom: 10, transition: 'transform 0.25s',
+            }}
+            onMouseEnter={e => { if (!_soldOut) e.currentTarget.style.transform = 'translateY(-2px)' }}
+            onMouseLeave={e => { if (!_soldOut) e.currentTarget.style.transform = 'translateY(0)' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: _soldOut ? 'rgba(251,251,243,0.3)' : 'var(--navy-900)' }} />
+            {_ctaLabel}
           </button>
+          )})()}
 
           <button style={{
             width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            padding: '17px 24px', background: 'transparent', color: 'var(--cream)',
-            border: '1px solid rgba(251,251,243,0.25)', borderRadius: 999,
-            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 500,
-            cursor: 'pointer',
-          }}>
-            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-              <svg width="11" height="11" viewBox="0 0 32 32" fill="#fff" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M16.001 4C9.373 4 4 9.373 4 16c0 2.114.553 4.166 1.6 5.978L4 28l6.18-1.621A11.94 11.94 0 0 0 16.001 28C22.628 28 28 22.627 28 16S22.628 4 16.001 4Zm0 21.818a9.83 9.83 0 0 1-5.011-1.367l-.359-.214-3.668.962.978-3.575-.234-.369A9.81 9.81 0 0 1 6.182 16c0-5.413 4.405-9.818 9.819-9.818 5.413 0 9.818 4.405 9.818 9.818 0 5.413-4.405 9.818-9.818 9.818Zm5.378-7.354c-.295-.148-1.745-.861-2.015-.96-.27-.099-.467-.148-.664.148-.197.295-.762.96-.934 1.158-.172.197-.344.222-.638.074-.295-.148-1.245-.459-2.371-1.464-.876-.781-1.467-1.745-1.639-2.04-.172-.295-.018-.455.13-.602.133-.133.295-.345.443-.517.148-.172.197-.295.295-.492.099-.197.05-.369-.025-.517-.074-.148-.664-1.6-.91-2.193-.24-.576-.483-.498-.664-.507a12.83 12.83 0 0 0-.566-.01c-.197 0-.517.074-.787.369-.27.295-1.033 1.009-1.033 2.461 0 1.452 1.058 2.855 1.205 3.052.148.197 2.082 3.18 5.046 4.46.706.305 1.256.487 1.685.623.708.225 1.353.193 1.863.117.568-.085 1.745-.713 1.992-1.402.246-.689.246-1.279.172-1.402-.074-.123-.27-.197-.566-.345Z"/>
-              </svg>
-            </span>
+            padding: '17px 24px', background: '#25D366', color: '#000',
+            border: 'none', borderRadius: 999,
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700,
+            cursor: 'pointer', transition: 'transform 0.25s, box-shadow 0.25s',
+            boxShadow: '0 4px 20px rgba(37,211,102,0.35)',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 28px rgba(37,211,102,0.5)' }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(37,211,102,0.35)' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width={20} height={20} aria-hidden="true" style={{ flexShrink: 0, display: 'block' }}>
+              <path fill="#000" d="M8.002 0h-.004C3.587 0 0 3.588 0 8a7.94 7.94 0 0 0 1.523 4.689l-.997 2.972 3.075-.983A7.93 7.93 0 0 0 8.002 16C12.413 16 16 12.411 16 8s-3.587-8-7.998-8zm4.655 11.297c-.193.545-.959.997-1.57 1.129-.418.089-.964.16-2.802-.602-2.351-.974-3.865-3.363-3.983-3.518-.113-.155-.95-1.265-.95-2.413s.583-1.707.818-1.947c.193-.197.512-.287.818-.287.099 0 .188.005.268.009.235.01.353.024.508.395.193.465.663 1.613.719 1.731.057.118.114.278.034.433-.075.16-.141.231-.259.367-.118.136-.23.24-.348.386-.108.127-.23.263-.094.498.136.23.606.997 1.298 1.613.893.795 1.617 1.049 1.876 1.157.193.08.423.061.564-.089.179-.193.4-.513.625-.828.16-.226.362-.254.574-.174.216.075 1.359.64 1.594.757.235.118.39.174.447.273.056.099.056.564-.137 1.11z" />
+            </svg>
             Chat on WhatsApp
           </button>
 

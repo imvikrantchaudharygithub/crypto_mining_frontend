@@ -2,7 +2,9 @@ export interface Product {
   _id?: string
   slug: string
   algo: string
-  stock: 'In Stock' | 'Coming Soon'
+  stock?: 'In Stock' | 'Coming Soon' | 'Sold Out'
+  computedStatus?: 'In Stock' | 'Sold Out' | 'Coming Soon'
+  quantity?: number
   tag: string
   name: string
   shortName: string   // for editorial hero card (e.g. "S19")

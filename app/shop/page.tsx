@@ -8,6 +8,15 @@ import InnerHero from '@/components/InnerHero'
 import FooterCTA from '@/components/FooterCTA'
 import { type Product } from '@/lib/products'
 
+type PublicStockStatus = 'In Stock' | 'Sold Out' | 'Coming Soon'
+
+function statusOf(p: Pick<Product, 'computedStatus' | 'available'>): PublicStockStatus {
+  if (p?.computedStatus === 'In Stock' || p?.computedStatus === 'Sold Out' || p?.computedStatus === 'Coming Soon') {
+    return p.computedStatus
+  }
+  return p?.available ? 'In Stock' : 'Coming Soon'
+}
+
 const DEFAULT_FILTERS = ['All', 'SHA-256', 'ETHASH', 'SCRYPT', 'KASPA']
 const DEFAULT_TRUST = [
   { icon: '⚡', label: 'Same-day activation', desc: 'Contracts go live within 24h of payment' },
@@ -37,7 +46,10 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
     return () => io.disconnect()
   }, [])
 
-  const isBestSeller = !!p.bestSeller && p.available
+  const _status = statusOf(p)
+  const _isInStock = _status === 'In Stock'
+  const _isSoldOut = _status === 'Sold Out'
+  const isBestSeller = !!p.bestSeller && _isInStock
 
   // Tone palette — adjusts every text/border so contrast holds on the dark animated gradient
   const tones = isBestSeller
@@ -66,8 +78,8 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
         solidBorder:  'rgba(10,22,40,0.08)',
         price:        'var(--ink)',
         gst:          'var(--navy-300)',
-        stockText:    p.stock === 'In Stock' ? 'var(--mint-500)' : 'var(--navy-300)',
-        stockDot:     p.stock === 'In Stock' ? 'var(--mint-500)' : 'var(--navy-300)',
+        stockText:    _isInStock ? 'var(--mint-500)' : _isSoldOut ? '#e11d48' : 'var(--navy-300)',
+        stockDot:     _isInStock ? 'var(--mint-500)' : _isSoldOut ? '#e11d48' : 'var(--navy-300)',
       }
 
   const cardStyle: React.CSSProperties = {
@@ -77,7 +89,7 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
     display: 'flex',
     flexDirection: 'column',
     gap: 18,
-    opacity: p.available ? 1 : 0.65,
+    opacity: _isInStock ? 1 : 0.65,
     position: 'relative',
     overflow: 'hidden',
     cursor: 'pointer',
@@ -85,7 +97,7 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
   // Best-seller card colors come from the .is-bestseller CSS class so the
   // animated gradient + halo can drive them. For everyone else, set inline.
   if (!isBestSeller) {
-    cardStyle.background = p.available ? 'var(--cream)' : 'rgba(251,251,243,0.5)'
+    cardStyle.background = _isInStock ? 'var(--cream)' : 'rgba(251,251,243,0.5)'
     cardStyle.border = '1px solid rgba(10,22,40,0.1)'
   }
 
@@ -140,8 +152,8 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
           <span aria-hidden style={{ visibility: 'hidden' }} className="mono">Best Seller</span>
         ) : (
           <span className="mono" style={{
-            background: p.available ? 'var(--navy-900)' : 'rgba(10,22,40,0.15)',
-            color: p.available ? 'var(--mint-400)' : 'var(--navy-500)',
+            background: _isInStock ? 'var(--navy-900)' : 'rgba(10,22,40,0.15)',
+            color: _isInStock ? 'var(--mint-400)' : 'var(--navy-500)',
             padding: '4px 10px', borderRadius: 999, fontSize: 9.5,
           }}>
             {p.tag}
@@ -149,7 +161,7 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
         )}
         <span className="mono" style={{ color: tones.stockText, fontSize: 9.5, display: 'flex', alignItems: 'center', gap: 5, position: 'relative', zIndex: 1 }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: tones.stockDot, display: 'inline-block' }} />
-          {p.stock}
+          {_status}
         </span>
       </div>
 
@@ -186,7 +198,7 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 2, position: 'relative', zIndex: 1 }}>
-        {p.available ? (
+        {_isInStock ? (
           <>
             <Link
               href={`/shop/${p.slug}`}
@@ -217,6 +229,10 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
               Details
             </Link>
           </>
+        ) : _isSoldOut ? (
+          <Link href={`/shop/${p.slug}`} className="btn-ghost" style={{ flex: 1, justifyContent: 'center', padding: '11px 14px', fontSize: 10.5, opacity: 0.7 }}>
+            Sold Out — View →
+          </Link>
         ) : (
           <Link href={`/shop/${p.slug}`} className="btn-ghost" style={{ flex: 1, justifyContent: 'center', padding: '11px 14px', fontSize: 10.5 }}>
             Coming Soon →
