@@ -5,27 +5,20 @@ import Navbar from '@/components/Navbar'
 import InnerHero from '@/components/InnerHero'
 import FooterCTA from '@/components/FooterCTA'
 
-const DEFAULT_MINERS = [
-  { name: 'Antminer S19 XP',   hashrate: 140,  power: 3010, algo: 'BTC' },
-  { name: 'Antminer S19j Pro', hashrate: 104,  power: 3068, algo: 'BTC' },
-  { name: 'Antminer S21 Pro',  hashrate: 234,  power: 3531, algo: 'BTC' },
-  { name: 'Jasminer X4-Q',     hashrate: 1040, power: 480,  algo: 'ETH' },
-  { name: 'Antminer L7',       hashrate: 9500, power: 3425, algo: 'LTC' },
-  { name: 'IceRiver KS3M',     hashrate: 6000, power: 3400, algo: 'KAS' },
-  { name: 'Custom',            hashrate: 0,    power: 0,    algo: 'BTC' },
-]
+// BTC mined per TH/s per day. Reflects current network difficulty + block subsidy + fees.
+// Matches the reference calculator (xyzmining.co.in) so user-facing numbers are comparable.
+const BTC_PER_TH_PER_DAY = 4.66e-7
 
-const NETWORK = {
-  BTC: { difficulty: 83.148e12, blockReward: 3.125, blockTime: 600, symbol: '₿', priceINR: 6800000 },
-  ETH: { difficulty: 15e15,     blockReward: 2,     blockTime: 12,  symbol: 'Ξ', priceINR: 330000  },
-  LTC: { difficulty: 28e6,      blockReward: 6.25,  blockTime: 150, symbol: 'Ł', priceINR: 9200    },
-  KAS: { difficulty: 5e12,      blockReward: 292,   blockTime: 1,   symbol: 'K', priceINR: 12      },
-}
+// Fixed power draw used by the cost model. Matches the reference calculator exactly
+// (Antminer S21-class). Intentionally NOT scaled with hashrate so output matches xyzmining.
+const FIXED_POWER_KW = 3.5
+
+const FALLBACK_BTC_INR = 8_500_000
 
 const DEFAULT_FAQS = [
-  { q: 'Does the calculator include maintenance fees?', a: 'No, because we charge 0%. The only cost modeled is electricity at your specified rate.' },
-  { q: 'What BTC price is used?',                       a: 'We use a real-time feed updated every 5 minutes. The rate shown is the current spot price in INR.' },
-  { q: 'Why does difficulty matter?',                   a: 'Bitcoin difficulty adjusts every ~2 weeks. Higher difficulty = lower rewards per TH/s. We use the current live difficulty.' },
+  { q: 'Does the calculator include maintenance fees?', a: 'No, because we charge 0%. The only cost modelled is electricity at your specified rate.' },
+  { q: 'What BTC price is used?',                       a: 'A live BTC/INR spot price pulled from a public market feed. If the feed is unreachable a cached fallback (₹85,00,000) is used so the page never blocks.' },
+  { q: 'How is power consumption estimated?',           a: 'A fixed 3.5 kW draw is assumed (Antminer S21-class). For different hardware, adjust your electricity rate accordingly so the daily cost ends up correct.' },
 ]
 
 type ProfitData = {
@@ -35,76 +28,86 @@ type ProfitData = {
     configHeading?: string
     resultsHeading?: string
     disclaimer?: string
-    miners?: { name: string; hashrate: number; power: number; algo: string }[]
-    defaults?: { electricityRate?: number; months?: number }
+    defaults?: { electricityRate?: number; hashrate?: number }
   }
   faqs?: { visible?: boolean; sectionTag?: string; items?: { q: string; a: string }[] }
 }
 
-function calcRewards(hashrateRaw: number, algo: string, months: number, electricityRate: number, powerW: number) {
-  const net = NETWORK[algo as keyof typeof NETWORK]
-  if (!net || hashrateRaw <= 0) return null
-
-  const hashrate = algo === 'ETH' ? hashrateRaw * 1e6 : algo === 'LTC' ? hashrateRaw * 1e6 : algo === 'KAS' ? hashrateRaw * 1e9 : hashrateRaw * 1e12
-  const blocksPerDay = 86400 / net.blockTime
-  const totalHashrate = net.difficulty * (2 ** 32) / net.blockTime
-  const sharePerDay = hashrate / totalHashrate
-  const coinsPerDay = sharePerDay * blocksPerDay * net.blockReward
-
-  const priceINR = net.priceINR
-  const revenuePerDay = coinsPerDay * priceINR
-  const powerCostPerDay = (powerW / 1000) * 24 * electricityRate
-  const profitPerDay = revenuePerDay - powerCostPerDay
-  const totalRevenue = revenuePerDay * months * 30
-  const totalCost = powerCostPerDay * months * 30
-  const totalProfit = profitPerDay * months * 30
-
-  return {
-    coinsPerDay, revenuePerDay, powerCostPerDay, profitPerDay,
-    totalRevenue, totalCost, totalProfit, priceINR,
-    symbol: net.symbol,
-    roiDays: profitPerDay > 0 ? Math.ceil(totalCost / profitPerDay) : null,
-  }
+function formatINR(n: number) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 }
 
-function StatBox({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
+function Row({ label, value, negative }: { label: string; value: string; negative?: boolean }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+      <span className="mono" style={{ fontSize: 10, color: 'rgba(251,251,243,0.45)', letterSpacing: '0.08em' }}>
+        {label}
+      </span>
+      <span style={{
+        fontFamily: 'var(--font-display)',
+        fontWeight: 600,
+        fontSize: 13.5,
+        color: negative ? 'rgba(255,138,128,0.85)' : 'rgba(251,251,243,0.92)',
+      }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function PeriodCard({
+  idx, label, days, revenuePerDay, costPerDay,
+}: {
+  idx: string; label: string; days: number; revenuePerDay: number; costPerDay: number
+}) {
+  const revenue = revenuePerDay * days
+  const cost = costPerDay * days
+  const profit = revenue - cost
+  const positive = profit >= 0
   return (
     <div style={{
       padding: 'clamp(20px,2.5vw,28px)',
-      background: accent ? 'var(--mint-100)' : 'rgba(251,251,243,0.06)',
-      borderRadius: 'var(--radius)',
-      border: accent ? '1px solid var(--mint-300)' : '1px solid rgba(251,251,243,0.1)',
+      background: positive ? 'rgba(168,224,99,0.06)' : 'rgba(255,100,100,0.05)',
+      borderRadius: 'var(--radius-lg)',
+      border: positive ? '1px solid rgba(168,224,99,0.18)' : '1px solid rgba(255,100,100,0.18)',
+      display: 'flex', flexDirection: 'column', gap: 12,
     }}>
-      <div className="mono" style={{ fontSize: 10, color: accent ? 'var(--mint-600)' : 'rgba(251,251,243,0.45)', marginBottom: 8, letterSpacing: '0.1em' }}>
-        {label}
+      <div className="mono" style={{ fontSize: 10, color: 'var(--mint-300)', letterSpacing: '0.16em', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ color: 'var(--mint-400)', fontWeight: 700 }}>{idx}</span>
+        <span style={{ opacity: 0.5 }}>/</span>
+        <span>{label}</span>
       </div>
-      <div style={{
-        fontFamily: 'var(--font-display)',
-        fontSize: 'clamp(22px,3vw,36px)',
-        fontWeight: 800,
-        letterSpacing: '-0.03em',
-        color: accent ? 'var(--navy-900)' : 'var(--mint-400)',
-        lineHeight: 1,
-      }}>
-        {value}
-      </div>
-      {sub && (
-        <div className="mono" style={{ fontSize: 9.5, color: accent ? 'var(--navy-500)' : 'rgba(251,251,243,0.35)', marginTop: 6 }}>
-          {sub}
+
+      <Row label="REVENUE"     value={formatINR(revenue)} />
+      <Row label="ELECTRICITY" value={`− ${formatINR(cost)}`} negative />
+
+      <div style={{ borderTop: '1px dashed rgba(168,224,99,0.18)', paddingTop: 14, marginTop: 4 }}>
+        <div className="mono" style={{ fontSize: 9, color: 'rgba(251,251,243,0.45)', letterSpacing: '0.16em', marginBottom: 6 }}>
+          NET PROFIT
         </div>
-      )}
+        <div style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 800,
+          fontSize: 'clamp(24px,3vw,32px)',
+          letterSpacing: '-0.03em',
+          color: positive ? 'var(--mint-400)' : '#ff8a80',
+          lineHeight: 1,
+        }}>
+          {formatINR(profit)}
+        </div>
+      </div>
     </div>
   )
 }
 
 export default function ProfitabilityPage() {
   const [page, setPage] = useState<ProfitData | null>(null)
-  const [selectedMiner, setSelectedMiner] = useState(0)
-  const [hashrate, setHashrate] = useState(140)
-  const [power, setPower] = useState(3010)
+  const [hashrate, setHashrate] = useState(200)
   const [electricityRate, setElectricityRate] = useState(8)
-  const [months, setMonths] = useState(12)
+  const [btcPrice, setBtcPrice] = useState<number | null>(null)
+  const [btcError, setBtcError] = useState(false)
 
+  // CMS content
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/page/profitability`, { cache: 'no-store' as RequestCache })
       .then(r => r.json())
@@ -112,27 +115,44 @@ export default function ProfitabilityPage() {
         const p = d.page ?? null
         setPage(p)
         if (p?.calculator?.defaults?.electricityRate !== undefined) setElectricityRate(p.calculator.defaults.electricityRate)
-        if (p?.calculator?.defaults?.months !== undefined) setMonths(p.calculator.defaults.months)
+        if (p?.calculator?.defaults?.hashrate !== undefined) setHashrate(p.calculator.defaults.hashrate)
       })
       .catch(() => {})
+  }, [])
+
+  // Live BTC/INR price — Coinbase spot (matches the reference calculator exactly),
+  // with a constant fallback if the feed is unreachable.
+  useEffect(() => {
+    let aborted = false
+    const fetchBtc = async () => {
+      try {
+        const r = await fetch('https://api.coinbase.com/v2/prices/BTC-INR/spot')
+        if (r.ok) {
+          const d = await r.json()
+          const v = parseFloat(d?.data?.amount)
+          if (Number.isFinite(v) && v > 0) { if (!aborted) setBtcPrice(v); return }
+        }
+      } catch { /* fall through */ }
+
+      if (!aborted) { setBtcPrice(FALLBACK_BTC_INR); setBtcError(true) }
+    }
+    fetchBtc()
+    return () => { aborted = true }
   }, [])
 
   const hero = page?.hero
   const calc = page?.calculator
   const faqsBlock = page?.faqs
-  const MINERS = calc?.miners && calc.miners.length > 0 ? calc.miners : DEFAULT_MINERS
-  const FAQS   = faqsBlock?.items && faqsBlock.items.length > 0 ? faqsBlock.items : DEFAULT_FAQS
+  const FAQS = faqsBlock?.items && faqsBlock.items.length > 0 ? faqsBlock.items : DEFAULT_FAQS
 
-  const miner = MINERS[Math.min(selectedMiner, MINERS.length - 1)] ?? MINERS[0]
-
-  useEffect(() => {
-    if (miner && miner.name !== 'Custom') {
-      setHashrate(miner.hashrate)
-      setPower(miner.power)
-    }
-  }, [selectedMiner, miner])
-
-  const results = calcRewards(hashrate, miner?.algo ?? 'BTC', months, electricityRate, power)
+  // Derived numbers — formulas mirror the reference calculator (xyzmining.co.in) exactly:
+  //   revenue = hash × 0.000000466 × btcPrice
+  //   cost    = 3.5 × 24 × kwh   (fixed 3.5 kW power draw, not scaled with hashrate)
+  const safeHash = Number.isFinite(hashrate) ? Math.max(0, hashrate) : 0
+  const safeRate = Number.isFinite(electricityRate) ? Math.max(0, electricityRate) : 0
+  const effectiveBtc = btcPrice ?? FALLBACK_BTC_INR
+  const revenuePerDay = safeHash * BTC_PER_TH_PER_DAY * effectiveBtc
+  const costPerDay = FIXED_POWER_KW * 24 * safeRate
 
   const revealRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -146,6 +166,30 @@ export default function ProfitabilityPage() {
     return () => io.disconnect()
   }, [])
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '14px 16px',
+    borderRadius: 12,
+    background: 'rgba(251,251,243,0.06)',
+    color: 'var(--cream)',
+    border: '1px solid rgba(251,251,243,0.14)',
+    fontFamily: 'var(--font-display)',
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: '-0.01em',
+    outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  }
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    color: 'rgba(251,251,243,0.45)',
+    marginBottom: 10,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+  }
+
   return (
     <main>
       <Navbar />
@@ -155,7 +199,7 @@ export default function ProfitabilityPage() {
           tagLabel={hero?.tagLabel ?? 'profit calculator'}
           headline={hero?.headline ?? 'Know your'}
           italicWord={hero?.italicWord ?? 'numbers.'}
-          mono={hero?.mono ?? 'live network difficulty · real electricity costs · no fluff'}
+          mono={hero?.mono ?? 'live BTC price · two inputs · 1, 7 & 15-day projections'}
           bgVariant="navy"
         />
       )}
@@ -166,142 +210,152 @@ export default function ProfitabilityPage() {
           padding: 'clamp(40px,6vw,80px) clamp(24px,5vw,80px)',
           paddingTop: 0,
         }}>
-          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-              gap: 'clamp(24px,3vw,40px)',
-              alignItems: 'start',
+          <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'clamp(28px,3.5vw,40px)' }}>
+
+            {/* Inputs panel — full width */}
+            <div className="reveal" style={{
+              background: 'rgba(251,251,243,0.05)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'clamp(24px,3vw,36px)',
+              border: '1px solid rgba(251,251,243,0.08)',
             }}>
-              {/* Inputs */}
-              <div className="reveal" style={{
-                background: 'rgba(251,251,243,0.05)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'clamp(24px,3vw,36px)',
-                border: '1px solid rgba(251,251,243,0.08)',
+              <div className="mono" style={{ fontSize: 10, color: 'var(--mint-300)', marginBottom: 20, letterSpacing: '0.14em' }}>
+                // {calc?.configHeading ?? 'CONFIGURE YOUR MINER'}
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: 18,
+                marginBottom: 22,
               }}>
-                <div className="mono" style={{ fontSize: 10, color: 'var(--mint-300)', marginBottom: 24, letterSpacing: '0.12em' }}>
-                  // {calc?.configHeading ?? 'CONFIGURE YOUR MINER'}
-                </div>
-
-                <label style={{ display: 'block', marginBottom: 20 }}>
-                  <div className="mono" style={{ fontSize: 10, color: 'rgba(251,251,243,0.4)', marginBottom: 8 }}>HARDWARE MODEL</div>
-                  <select
-                    value={selectedMiner}
-                    onChange={e => setSelectedMiner(Number(e.target.value))}
-                    style={{
-                      width: '100%', padding: '12px 14px', borderRadius: 10,
-                      background: 'rgba(251,251,243,0.08)', color: 'var(--cream)',
-                      border: '1px solid rgba(251,251,243,0.12)',
-                      fontFamily: 'var(--font-display)', fontSize: 14, outline: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {MINERS.map((m, i) => (
-                      <option key={i} value={i} style={{ background: 'var(--navy-800)' }}>{m.name}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label style={{ display: 'block', marginBottom: 20 }}>
-                  <div className="mono" style={{ fontSize: 10, color: 'rgba(251,251,243,0.4)', marginBottom: 8 }}>
-                    HASHRATE ({miner?.algo === 'ETH' ? 'MH/s' : miner?.algo === 'LTC' ? 'MH/s' : miner?.algo === 'KAS' ? 'GH/s' : 'TH/s'})
-                  </div>
+                <label>
+                  <span style={labelStyle}>Hashrate (TH/s)</span>
                   <input
-                    type="number" value={hashrate}
-                    onChange={e => setHashrate(Number(e.target.value))}
-                    style={{
-                      width: '100%', padding: '12px 14px', borderRadius: 10,
-                      background: 'rgba(251,251,243,0.08)', color: 'var(--cream)',
-                      border: '1px solid rgba(251,251,243,0.12)',
-                      fontFamily: 'var(--font-display)', fontSize: 14, outline: 'none',
-                    }}
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step={1}
+                    value={Number.isFinite(hashrate) ? hashrate : ''}
+                    onChange={e => setHashrate(e.target.value === '' ? 0 : Number(e.target.value))}
+                    onFocus={e => { e.currentTarget.style.borderColor = 'var(--mint-400)'; e.currentTarget.style.boxShadow = '0 0 0 4px rgba(168,224,99,0.18)' }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(251,251,243,0.14)'; e.currentTarget.style.boxShadow = 'none' }}
+                    style={inputStyle}
                   />
                 </label>
 
-                <label style={{ display: 'block', marginBottom: 20 }}>
-                  <div className="mono" style={{ fontSize: 10, color: 'rgba(251,251,243,0.4)', marginBottom: 8 }}>POWER CONSUMPTION (W)</div>
+                <label>
+                  <span style={labelStyle}>Electricity (₹/kWh)</span>
                   <input
-                    type="number" value={power}
-                    onChange={e => setPower(Number(e.target.value))}
-                    style={{
-                      width: '100%', padding: '12px 14px', borderRadius: 10,
-                      background: 'rgba(251,251,243,0.08)', color: 'var(--cream)',
-                      border: '1px solid rgba(251,251,243,0.12)',
-                      fontFamily: 'var(--font-display)', fontSize: 14, outline: 'none',
-                    }}
-                  />
-                </label>
-
-                <label style={{ display: 'block', marginBottom: 24 }}>
-                  <div className="mono" style={{ fontSize: 10, color: 'rgba(251,251,243,0.4)', marginBottom: 8 }}>
-                    ELECTRICITY RATE (₹/kWh) — current: ₹{electricityRate}
-                  </div>
-                  <input
-                    type="range" min={2} max={20} step={0.5}
-                    value={electricityRate}
-                    onChange={e => setElectricityRate(Number(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--mint-400)' }}
-                  />
-                </label>
-
-                <label style={{ display: 'block' }}>
-                  <div className="mono" style={{ fontSize: 10, color: 'rgba(251,251,243,0.4)', marginBottom: 8 }}>
-                    CONTRACT DURATION — {months} months
-                  </div>
-                  <input
-                    type="range" min={1} max={24} step={1}
-                    value={months}
-                    onChange={e => setMonths(Number(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--mint-400)' }}
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step={0.5}
+                    value={Number.isFinite(electricityRate) ? electricityRate : ''}
+                    onChange={e => setElectricityRate(e.target.value === '' ? 0 : Number(e.target.value))}
+                    onFocus={e => { e.currentTarget.style.borderColor = 'var(--mint-400)'; e.currentTarget.style.boxShadow = '0 0 0 4px rgba(168,224,99,0.18)' }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(251,251,243,0.14)'; e.currentTarget.style.boxShadow = 'none' }}
+                    style={inputStyle}
                   />
                 </label>
               </div>
 
-              {/* Results */}
-              <div className="reveal" style={{ transitionDelay: '100ms' }}>
-                <div className="mono" style={{ fontSize: 10, color: 'var(--mint-300)', marginBottom: 20, letterSpacing: '0.12em' }}>
-                  // {calc?.resultsHeading ?? 'PROJECTED RETURNS'}
+              {/* Live BTC pill + derived power estimate */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 12,
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <div className="prof-btc-pill" aria-live="polite">
+                  <span className="prof-btc-pill__dot" aria-hidden />
+                  <span className="prof-btc-pill__label mono">{btcError ? 'BTC / INR (cached)' : 'LIVE BTC / INR'}</span>
+                  <span className="prof-btc-pill__value">
+                    {btcPrice ? formatINR(btcPrice) : '…'}
+                  </span>
                 </div>
-
-                {results ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                    <StatBox label="DAILY COINS" value={`${results.symbol}${results.coinsPerDay.toFixed(8)}`} sub={`≈ ₹${results.revenuePerDay.toLocaleString('en-IN', { maximumFractionDigits: 0 })} / day`} />
-                    <StatBox label="DAILY PROFIT" value={`₹${Math.max(0, results.profitPerDay).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} sub={`after ₹${results.powerCostPerDay.toFixed(0)} electricity`} accent />
-                    <StatBox label={`${months}-MONTH REVENUE`} value={`₹${(results.totalRevenue / 100000).toFixed(1)}L`} sub="gross mining income" />
-                    <StatBox label={`${months}-MONTH PROFIT`} value={`₹${(Math.max(0, results.totalProfit) / 100000).toFixed(1)}L`} sub="after power costs" accent />
-                    <div style={{
-                      gridColumn: '1/-1',
-                      padding: 'clamp(20px,2.5vw,28px)',
-                      background: results.roiDays && results.roiDays < months * 30 ? 'rgba(168,224,99,0.12)' : 'rgba(255,100,100,0.08)',
-                      borderRadius: 'var(--radius)',
-                      border: `1px solid ${results.roiDays && results.roiDays < months * 30 ? 'rgba(168,224,99,0.2)' : 'rgba(255,100,100,0.15)'}`,
-                    }}>
-                      <div className="mono" style={{ fontSize: 10, color: 'rgba(251,251,243,0.45)', marginBottom: 8 }}>BREAK-EVEN</div>
-                      <div style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: 'clamp(28px,4vw,44px)',
-                        fontWeight: 800,
-                        letterSpacing: '-0.04em',
-                        color: results.roiDays && results.roiDays < months * 30 ? 'var(--mint-400)' : '#ff8a80',
-                        lineHeight: 1,
-                      }}>
-                        {results.roiDays ? `${results.roiDays} days` : 'Not profitable'}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(251,251,243,0.3)' }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700 }}>Enter hashrate to calculate</div>
-                  </div>
-                )}
-
-                <p className="mono" style={{ fontSize: 9, color: 'rgba(251,251,243,0.2)', marginTop: 20, lineHeight: 1.6 }}>
-                  {calc?.disclaimer ?? '* Estimates based on current network difficulty and BTC price. Past performance does not guarantee future results. Difficulty adjusts every ~2016 blocks.'}
-                </p>
+                <div className="mono" style={{ fontSize: 10, color: 'rgba(251,251,243,0.4)', letterSpacing: '0.06em' }}>
+                  // power assumed {FIXED_POWER_KW} kW (Antminer S21-class)
+                </div>
               </div>
             </div>
+
+            {/* Results — three time windows */}
+            <div className="reveal" style={{ transitionDelay: '100ms' }}>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--mint-300)', marginBottom: 20, letterSpacing: '0.14em' }}>
+                // {calc?.resultsHeading ?? 'PROJECTED PROFIT'}
+              </div>
+
+              <div className="prof-period-grid" style={{ display: 'grid', gap: 16 }}>
+                <PeriodCard idx="01" label="1 DAY"     days={1}   revenuePerDay={revenuePerDay} costPerDay={costPerDay} />
+                <PeriodCard idx="02" label="7 DAYS"    days={7}   revenuePerDay={revenuePerDay} costPerDay={costPerDay} />
+                <PeriodCard idx="03" label="15 DAYS"   days={15}  revenuePerDay={revenuePerDay} costPerDay={costPerDay} />
+                <PeriodCard idx="04" label="1 MONTH"   days={30}  revenuePerDay={revenuePerDay} costPerDay={costPerDay} />
+                <PeriodCard idx="05" label="6 MONTHS"  days={180} revenuePerDay={revenuePerDay} costPerDay={costPerDay} />
+                <PeriodCard idx="06" label="1 YEAR"    days={365} revenuePerDay={revenuePerDay} costPerDay={costPerDay} />
+              </div>
+
+              <p className="mono" style={{ fontSize: 9.5, color: 'rgba(251,251,243,0.28)', marginTop: 20, lineHeight: 1.6 }}>
+                {calc?.disclaimer ?? `* Estimates based on a fixed yield of ${BTC_PER_TH_PER_DAY.toExponential(2)} BTC / TH / day and current BTC/INR spot. Network difficulty adjusts every ~2016 blocks; real returns will drift.`}
+              </p>
+            </div>
           </div>
+
+          <style>{`
+            .prof-period-grid {
+              grid-template-columns: 1fr;
+            }
+            @media (min-width: 640px) {
+              .prof-period-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            }
+            @media (min-width: 1024px) {
+              .prof-period-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            }
+            .prof-btc-pill {
+              display: inline-flex;
+              align-items: center;
+              gap: 10px;
+              padding: 7px 14px 7px 11px;
+              border-radius: 999px;
+              background: rgba(34, 197, 94, 0.10);
+              border: 1px solid rgba(34, 197, 94, 0.32);
+              animation: profBtcGlow 1.8s ease-in-out infinite;
+            }
+            .prof-btc-pill__dot {
+              width: 7px; height: 7px;
+              border-radius: 50%;
+              background: #4ade80;
+              box-shadow: 0 0 6px #4ade80, 0 0 12px rgba(74,222,128,0.6);
+              animation: profBtcDot 1.2s ease-in-out infinite;
+            }
+            .prof-btc-pill__label {
+              font-size: 9.5px;
+              font-weight: 800;
+              letter-spacing: 0.16em;
+              text-transform: uppercase;
+              color: #4ade80;
+              text-shadow: 0 0 6px rgba(74,222,128,0.55);
+            }
+            .prof-btc-pill__value {
+              font-family: var(--font-display);
+              font-weight: 700;
+              font-size: 13.5px;
+              color: var(--cream);
+              letter-spacing: -0.01em;
+            }
+            @keyframes profBtcGlow {
+              0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); }
+              50%      { box-shadow: 0 0 14px 0 rgba(74,222,128,0.5), 0 0 0 3px rgba(74,222,128,0.10); }
+            }
+            @keyframes profBtcDot {
+              0%, 100% { opacity: 1;   transform: scale(1); }
+              50%      { opacity: 0.55; transform: scale(0.85); }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .prof-btc-pill, .prof-btc-pill__dot { animation: none; }
+            }
+          `}</style>
         </section>
       )}
 

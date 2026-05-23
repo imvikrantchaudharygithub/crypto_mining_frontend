@@ -54,10 +54,37 @@ const DEFAULT_STATS = [
   { idx: '04', value: 0,    suffix: '',  label: 'Maintenance fee',  hint: 'never. ever.',      decimals: 0, prefix: '₹' },
 ]
 
+type FormState = { name: string; email: string; phone: string; subject: string; message: string }
+type TouchedState = Partial<Record<keyof FormState, boolean>>
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+const PHONE_RE = /^[+\d][\d\s\-()]{6,}$/
+
+function validate(form: FormState): Partial<Record<keyof FormState, string>> {
+  const errors: Partial<Record<keyof FormState, string>> = {}
+  if (!form.name.trim()) errors.name = 'Please enter your name'
+  else if (form.name.trim().length < 2) errors.name = 'Name is too short'
+
+  if (!form.email.trim()) errors.email = 'Please enter your email'
+  else if (!EMAIL_RE.test(form.email.trim())) errors.email = 'Enter a valid email'
+
+  if (form.phone.trim() && !PHONE_RE.test(form.phone.trim())) errors.phone = 'Enter a valid phone number'
+
+  if (!form.message.trim()) errors.message = 'Please enter a message'
+  else if (form.message.trim().length < 10) errors.message = 'Message must be at least 10 characters'
+
+  return errors
+}
+
 export default function ContactPage() {
   const [page, setPage] = useState<ContactData | null>(null)
-  const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' })
+  const [form, setForm] = useState<FormState>({ name: '', email: '', phone: '', subject: '', message: '' })
+  const [touched, setTouched] = useState<TouchedState>({})
   const [submitted, setSubmitted] = useState(false)
+
+  const errors = validate(form)
+  const isValid = Object.keys(errors).length === 0
+  const showError = (key: keyof FormState) => touched[key] && errors[key]
 
   const revealRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -88,10 +115,11 @@ export default function ContactPage() {
   const SUBJECTS = enquiryForm?.subjects && enquiryForm.subjects.length > 0 ? enquiryForm.subjects : DEFAULT_SUBJECTS
   const STATS    = numbers?.stats && numbers.stats.length > 0 ? numbers.stats : DEFAULT_STATS
 
-  const field = (key: keyof typeof form) => ({
+  const field = (key: keyof FormState) => ({
     value: form[key],
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm(f => ({ ...f, [key]: e.target.value })),
+    onBlur: () => setTouched(t => ({ ...t, [key]: true })),
   })
 
   const inputStyle: React.CSSProperties = {
@@ -102,6 +130,13 @@ export default function ContactPage() {
     fontFamily: 'var(--font-body)',
     fontSize: 14, color: 'var(--ink)',
     transition: 'border-color 0.2s',
+  }
+  const errorBorder = '1px solid #d93838'
+  const inputStyleFor = (key: keyof FormState): React.CSSProperties =>
+    showError(key) ? { ...inputStyle, border: errorBorder } : inputStyle
+  const errorTextStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)', fontSize: 10, color: '#d93838',
+    marginTop: 6, letterSpacing: '0.04em',
   }
   const labelStyle: React.CSSProperties = {
     display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10,
@@ -229,8 +264,13 @@ export default function ContactPage() {
                 </div>
               ) : (
                 <form
+                  noValidate
                   onSubmit={async (e) => {
                     e.preventDefault()
+                    if (!isValid) {
+                      setTouched({ name: true, email: true, phone: true, subject: true, message: true })
+                      return
+                    }
                     await fetch(`${process.env.NEXT_PUBLIC_API_URL}/create-lead`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -251,17 +291,36 @@ export default function ContactPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <label>
                       <span style={labelStyle}>Full Name</span>
-                      <input required placeholder="Your name" style={inputStyle} {...field('name')} />
+                      <input
+                        placeholder="Your name"
+                        style={inputStyleFor('name')}
+                        aria-invalid={!!showError('name')}
+                        {...field('name')}
+                      />
+                      {showError('name') && <div style={errorTextStyle}>{errors.name}</div>}
                     </label>
                     <label>
                       <span style={labelStyle}>Email</span>
-                      <input required type="email" placeholder="you@example.com" style={inputStyle} {...field('email')} />
+                      <input
+                        type="email"
+                        placeholder="you@example.com"
+                        style={inputStyleFor('email')}
+                        aria-invalid={!!showError('email')}
+                        {...field('email')}
+                      />
+                      {showError('email') && <div style={errorTextStyle}>{errors.email}</div>}
                     </label>
                   </div>
 
                   <label>
                     <span style={labelStyle}>Phone (optional)</span>
-                    <input placeholder="+91 98765 43210" style={inputStyle} {...field('phone')} />
+                    <input
+                      placeholder="+91 98765 43210"
+                      style={inputStyleFor('phone')}
+                      aria-invalid={!!showError('phone')}
+                      {...field('phone')}
+                    />
+                    {showError('phone') && <div style={errorTextStyle}>{errors.phone}</div>}
                   </label>
 
                   <label>
@@ -273,10 +332,28 @@ export default function ContactPage() {
 
                   <label>
                     <span style={labelStyle}>Message</span>
-                    <textarea required rows={5} placeholder="Tell us what you're looking for..." style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.65 }} {...field('message')} />
+                    <textarea
+                      rows={5}
+                      placeholder="Tell us what you're looking for..."
+                      style={{ ...inputStyleFor('message'), resize: 'vertical', lineHeight: 1.65 }}
+                      aria-invalid={!!showError('message')}
+                      {...field('message')}
+                    />
+                    {showError('message') && <div style={errorTextStyle}>{errors.message}</div>}
                   </label>
 
-                  <button type="submit" className="btn-primary" style={{ justifyContent: 'center', fontSize: 12 }}>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={!isValid}
+                    aria-disabled={!isValid}
+                    style={{
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      opacity: isValid ? 1 : 0.5,
+                      cursor: isValid ? 'pointer' : 'not-allowed',
+                    }}
+                  >
                     <span className="dot" /> {enquiryForm?.submitLabel ?? 'Send message'}
                   </button>
 

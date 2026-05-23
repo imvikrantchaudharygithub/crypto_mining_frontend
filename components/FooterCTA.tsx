@@ -111,7 +111,7 @@ export default function FooterCTA({ data }: { data?: FooterCTAData }) {
           <em style={{ fontStyle: 'italic', color: 'var(--mint-400)' }}>{headlineItalic}</em>
         </h2>
 
-        <div className="reveal" style={{ transitionDelay: '160ms' }}>
+        {/* <div className="reveal" style={{ transitionDelay: '160ms' }}>
           <a
             href={ctaHref}
             className="btn-primary"
@@ -126,7 +126,7 @@ export default function FooterCTA({ data }: { data?: FooterCTAData }) {
             <span className="dot" style={{ background: 'var(--navy-900)' }} />
             {ctaLabel}
           </a>
-        </div>
+        </div> */}
 
         <div
           style={{

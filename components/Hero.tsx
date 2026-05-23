@@ -100,7 +100,53 @@ const HERO_CSS = `
   border: 1px solid rgba(247, 147, 26, 0.35);
   position: relative;
   z-index: 1;
-  box-shadow: 0 0 12px -2px rgba(247, 147, 26, 0.55);
+  animation: btcIconGlow 2.2s ease-in-out infinite;
+}
+.btc-pill__icon svg {
+  filter: drop-shadow(0 0 4px rgba(247, 147, 26, 0.85));
+  animation: btcIconDropGlow 2.2s ease-in-out infinite;
+}
+.btc-pill__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  color: #4ade80;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 0 6px rgba(74, 222, 128, 0.75);
+  animation: btcLiveGlow 1.6s ease-in-out infinite;
+}
+.btc-pill__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 6px #4ade80, 0 0 12px rgba(74, 222, 128, 0.6);
+  animation: btcLiveDot 1.2s ease-in-out infinite;
+}
+@keyframes btcIconGlow {
+  0%, 100% { box-shadow: 0 0 10px -2px rgba(247, 147, 26, 0.55), 0 0 0 0 rgba(247, 147, 26, 0); }
+  50%      { box-shadow: 0 0 18px 2px rgba(247, 147, 26, 0.85), 0 0 0 4px rgba(247, 147, 26, 0.18); }
+}
+@keyframes btcIconDropGlow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(247, 147, 26, 0.65)); }
+  50%      { filter: drop-shadow(0 0 8px rgba(247, 147, 26, 1)); }
+}
+@keyframes btcLiveGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+  50%      { box-shadow: 0 0 14px 0 rgba(74, 222, 128, 0.55), 0 0 0 3px rgba(74, 222, 128, 0.10); }
+}
+@keyframes btcLiveDot {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.85); }
 }
 .btc-pill__label {
   font-size: 9.5px;
@@ -157,7 +203,11 @@ const HERO_CSS = `
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .btc-pill { animation: none; }
+  .btc-pill,
+  .btc-pill__icon,
+  .btc-pill__icon svg,
+  .btc-pill__live,
+  .btc-pill__live-dot { animation: none; }
 }
 `
 
@@ -255,6 +305,10 @@ export default function Hero({ hero }: { hero?: HeroProp }) {
                     fill="#fff"
                   />
                 </svg>
+              </span>
+              <span className="btc-pill__live mono" aria-label="live">
+                <span className="btc-pill__live-dot" aria-hidden />
+                LIVE
               </span>
               <span className="btc-pill__label mono">{btcLabel}</span>
               <span className="btc-pill__value">{btcValue}</span>

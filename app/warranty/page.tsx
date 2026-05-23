@@ -10,17 +10,19 @@ import FooterCTA from '@/components/FooterCTA'
  *   GET https://shop-repair.bitmain.com/api/warranty/getWarranty?serialNumber=<SN>
  *
  * Observed response shapes:
- *   not found     → { warranty: 0, haveWhiteList: "N", code: 0 }
- *   empty input   → { code: 1, message: "serialNumber is empty" }
- *   found (assumed shape, surfaces whatever extra keys come back)
- *                 → { warranty: 1, haveWhiteList: "Y", code: 0,
- *                     productModel / model / productName?, shipDate?,
- *                     warrantyExpireDate / expireDate?, status? ... }
+ *   not found    → { warranty: 0, haveWhiteList: "N", code: 0 }
+ *   empty input  → { code: 1, message: "serialNumber is empty" }
+ *   found        → { warranty: 346, warrantyEndDate: "2027-05-06 00:00:00",
+ *                    haveWhiteList: "N" | "Y", code: 0 }
+ *                  `warranty` is days remaining (authoritative).
+ *                  `warrantyEndDate` is the expiry timestamp.
+ *                  Some units may additionally return productModel / shipDate / status.
  */
 const WARRANTY_API = 'https://shop-repair.bitmain.com/api/warranty/getWarranty'
 
 type WarrantyResponse = {
   warranty?: number
+  warrantyEndDate?: string
   haveWhiteList?: 'Y' | 'N' | string
   code?: number
   message?: string
@@ -55,7 +57,9 @@ const pick = (d: WarrantyResponse, ...keys: string[]): string | undefined => {
 
 const formatDate = (raw?: string): string | undefined => {
   if (!raw) return undefined
-  const d = new Date(raw)
+  // Bitmain returns "YYYY-MM-DD HH:mm:ss" — normalize to ISO for Safari compatibility.
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T')
+  const d = new Date(normalized)
   if (Number.isNaN(d.getTime())) return raw
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' })
 }
@@ -115,7 +119,7 @@ export default function WarrantyPage() {
       const hasRecord =
         (typeof data.warranty === 'number' && data.warranty > 0) ||
         data.haveWhiteList === 'Y' ||
-        !!pick(data, 'productModel', 'model', 'productName', 'warrantyExpireDate', 'expireDate', 'endDate', 'shipDate')
+        !!pick(data, 'productModel', 'model', 'productName', 'warrantyEndDate', 'warrantyExpireDate', 'expireDate', 'endDate', 'shipDate')
 
       if (hasRecord) {
         setState({ kind: 'found', sn: clean, data })
@@ -501,14 +505,26 @@ function NotFoundCard({ sn }: { sn: string }) {
 function FoundCard({ sn, data }: { sn: string; data: WarrantyResponse }) {
   const model = pick(data, 'productModel', 'model', 'productName')
   const shipDate = pick(data, 'shipDate', 'warrantyStartDate', 'startDate')
-  const expireDate = pick(data, 'warrantyExpireDate', 'expireDate', 'endDate')
+  const expireDate = pick(data, 'warrantyEndDate', 'warrantyExpireDate', 'expireDate', 'endDate')
   const apiStatus = pick(data, 'status')
   const whitelisted = data.haveWhiteList === 'Y'
 
-  const expiry = useMemo(() => (expireDate ? new Date(expireDate) : null), [expireDate])
-  const now = new Date()
-  const remaining = expiry && !Number.isNaN(expiry.getTime()) ? daysBetween(now, expiry) : null
-  const isExpired = remaining !== null ? remaining < 0 : false
+  // Prefer the API's authoritative `warranty` (days remaining) when present.
+  // Fall back to computing from the expiry date.
+  const expiry = useMemo(() => {
+    if (!expireDate) return null
+    const normalized = expireDate.includes('T') ? expireDate : expireDate.replace(' ', 'T')
+    const d = new Date(normalized)
+    return Number.isNaN(d.getTime()) ? null : d
+  }, [expireDate])
+  const apiDays = typeof data.warranty === 'number' ? data.warranty : null
+  const remaining =
+    apiDays !== null
+      ? apiDays
+      : expiry
+      ? daysBetween(new Date(), expiry)
+      : null
+  const isExpired = remaining !== null ? remaining <= 0 : false
   const statusLabel = apiStatus
     ? apiStatus
     : isExpired
@@ -529,6 +545,7 @@ function FoundCard({ sn, data }: { sn: string; data: WarrantyResponse }) {
         'shipDate',
         'warrantyStartDate',
         'startDate',
+        'warrantyEndDate',
         'warrantyExpireDate',
         'expireDate',
         'endDate',

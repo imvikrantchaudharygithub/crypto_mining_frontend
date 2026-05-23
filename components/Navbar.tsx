@@ -149,12 +149,12 @@ export default function Navbar({
         {/* Desktop CTA — Call Us */}
         <a
           href={callHref}
-          className="btn-primary hide-mobile"
+          className="btn-primary nav-call-glow hide-mobile"
           style={{ padding: '10px 20px', fontSize: 10.5, gap: 8 }}
           aria-label={`${callLabel} — ${callDisplay}`}
           title={callDisplay}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg className="nav-call-glow__icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
           </svg>
           {callLabel}
@@ -232,12 +232,12 @@ export default function Navbar({
           ))}
           <a
             href={callHref}
-            className="btn-primary"
+            className="btn-primary nav-call-glow"
             style={{ marginTop: 24, opacity: 0, animation: `fadeSlideUp 0.4s cubic-bezier(.2,.8,.2,1) 320ms forwards`, gap: 8 }}
             onClick={() => setMenuOpen(false)}
             aria-label={`${callLabel} — ${callDisplay}`}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg className="nav-call-glow__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
             </svg>
             {callLabel}
@@ -252,6 +252,36 @@ export default function Navbar({
         @keyframes fadeSlideUp {
           from { opacity: 0; transform: translateY(24px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Pulsing mint glow on the Call Us CTA */
+        .nav-call-glow {
+          position: relative;
+          animation: navCallGlow 2s ease-in-out infinite;
+        }
+        .nav-call-glow:hover {
+          animation-play-state: paused;
+          box-shadow: 0 0 22px 2px rgba(168, 224, 99, 0.85), 0 0 0 4px rgba(168, 224, 99, 0.22);
+        }
+        .nav-call-glow__icon {
+          filter: drop-shadow(0 0 4px rgba(168, 224, 99, 0.85));
+          animation: navCallIconGlow 2s ease-in-out infinite;
+        }
+        @keyframes navCallGlow {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(168, 224, 99, 0), 0 0 10px -2px rgba(168, 224, 99, 0.35);
+          }
+          50% {
+            box-shadow: 0 0 18px 0 rgba(168, 224, 99, 0.75), 0 0 0 4px rgba(168, 224, 99, 0.18);
+          }
+        }
+        @keyframes navCallIconGlow {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(168, 224, 99, 0.55)); }
+          50%      { filter: drop-shadow(0 0 8px rgba(168, 224, 99, 1)); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .nav-call-glow,
+          .nav-call-glow__icon { animation: none; }
         }
       `}</style>
     </>

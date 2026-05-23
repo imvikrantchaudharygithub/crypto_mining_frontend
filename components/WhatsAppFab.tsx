@@ -6,6 +6,7 @@ import { fetchSiteSettings, DEFAULT_CONTACT, digitsOnly, type SiteContact } from
 export default function WhatsAppFab({ contact: contactProp }: { contact?: SiteContact }) {
   const [contact, setContact] = useState<SiteContact | null>(contactProp ?? null)
   const [visible, setVisible] = useState(false)
+  const [pageUrl, setPageUrl] = useState('')
 
   useEffect(() => {
     if (contactProp) return
@@ -18,13 +19,24 @@ export default function WhatsAppFab({ contact: contactProp }: { contact?: SiteCo
     return () => window.clearTimeout(t)
   }, [])
 
+  // Capture current URL after mount so the href stays consistent across SSR/hydration
+  // and updates if the user navigates (client-side route changes).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const updateUrl = () => setPageUrl(window.location.href)
+    updateUrl()
+    window.addEventListener('popstate', updateUrl)
+    return () => window.removeEventListener('popstate', updateUrl)
+  }, [])
+
   const enabled = contact?.whatsappEnabled !== false
   if (!enabled) return null
 
   const number = digitsOnly(contact?.whatsappNumber || DEFAULT_CONTACT.whatsappNumber)
   if (!number) return null
 
-  const message = contact?.whatsappMessage || DEFAULT_CONTACT.whatsappMessage
+  const baseMessage = contact?.whatsappMessage || DEFAULT_CONTACT.whatsappMessage
+  const message = pageUrl ? `${baseMessage}\n\nPage: ${pageUrl}` : baseMessage
   const href = `https://wa.me/${number}?text=${encodeURIComponent(message)}`
 
   return (
