@@ -7,8 +7,29 @@ import Navbar from '@/components/Navbar'
 import InnerHero from '@/components/InnerHero'
 import FooterCTA from '@/components/FooterCTA'
 import { type Product } from '@/lib/products'
+import { fetchSiteSettings, DEFAULT_CONTACT, digitsOnly, type SiteContact } from '@/lib/siteSettings'
 
 type PublicStockStatus = 'In Stock' | 'Sold Out' | 'Coming Soon'
+
+const fmtINR = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN')
+
+function buildWaHref(p: Product, contact: SiteContact | null, origin: string): string | undefined {
+  const number = digitsOnly(contact?.whatsappNumber || DEFAULT_CONTACT.whatsappNumber)
+  if (!number) return undefined
+  const link = origin ? `${origin}/shop/${p.slug}` : ''
+  const lines = [
+    `Hi, I'm interested in the *${p.name}*.`,
+    '',
+    p.hashrate ? `• Hashrate: ${p.hashrate}` : '',
+    p.power ? `• Power: ${p.power}` : '',
+    typeof p.price === 'number' && p.price > 0 ? `• Price: ${fmtINR(p.price)}` : '',
+    p.sku ? `• SKU: ${p.sku}` : '',
+    link ? `• Link: ${link}` : '',
+    '',
+    'Please share availability and shipping details.',
+  ].filter(Boolean)
+  return `https://wa.me/${number}?text=${encodeURIComponent(lines.join('\n'))}`
+}
 
 function statusOf(p: Pick<Product, 'computedStatus' | 'available'>): PublicStockStatus {
   if (p?.computedStatus === 'In Stock' || p?.computedStatus === 'Sold Out' || p?.computedStatus === 'Coming Soon') {
@@ -32,9 +53,10 @@ type ShopPageData = {
   trust?: { visible?: boolean; items?: { icon: string; label: string; desc: string }[] }
 }
 
-function ProductCard({ p, i }: { p: Product; i: number }) {
+function ProductCard({ p, i, contact, origin }: { p: Product; i: number; contact: SiteContact | null; origin: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const waHref = buildWaHref(p, contact, origin)
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -200,22 +222,45 @@ function ProductCard({ p, i }: { p: Product; i: number }) {
       <div style={{ display: 'flex', gap: 10, marginTop: 2, position: 'relative', zIndex: 1 }}>
         {_isInStock ? (
           <>
+            {waHref ? (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Buy ${p.name} — chat on WhatsApp`}
+                onClick={(e) => e.stopPropagation()}
+                className="btn-primary"
+                style={{
+                  flex: 1, justifyContent: 'center', padding: '11px 14px', fontSize: 10.5,
+                  ...(isBestSeller && {
+                    background: 'var(--mint-400)',
+                    color: 'var(--navy-900)',
+                    boxShadow: '0 6px 18px -6px rgba(168,224,99,0.55)',
+                  }),
+                }}
+              >
+                <span className="dot" style={isBestSeller ? { background: 'var(--navy-900)' } : undefined} /> Buy Miner →
+              </a>
+            ) : (
+              <Link
+                href={`/shop/${p.slug}`}
+                onClick={(e) => e.stopPropagation()}
+                className="btn-primary"
+                style={{
+                  flex: 1, justifyContent: 'center', padding: '11px 14px', fontSize: 10.5,
+                  ...(isBestSeller && {
+                    background: 'var(--mint-400)',
+                    color: 'var(--navy-900)',
+                    boxShadow: '0 6px 18px -6px rgba(168,224,99,0.55)',
+                  }),
+                }}
+              >
+                <span className="dot" style={isBestSeller ? { background: 'var(--navy-900)' } : undefined} /> Buy Miner →
+              </Link>
+            )}
             <Link
               href={`/shop/${p.slug}`}
-              className="btn-primary"
-              style={{
-                flex: 1, justifyContent: 'center', padding: '11px 14px', fontSize: 10.5,
-                ...(isBestSeller && {
-                  background: 'var(--mint-400)',
-                  color: 'var(--navy-900)',
-                  boxShadow: '0 6px 18px -6px rgba(168,224,99,0.55)',
-                }),
-              }}
-            >
-              <span className="dot" style={isBestSeller ? { background: 'var(--navy-900)' } : undefined} /> Buy Contract
-            </Link>
-            <Link
-              href={`/shop/${p.slug}`}
+              onClick={(e) => e.stopPropagation()}
               className="btn-ghost"
               style={{
                 padding: '11px 14px', fontSize: 10.5,
@@ -247,6 +292,8 @@ export default function ShopPage() {
   const [activeFilter, setActiveFilter] = useState('All')
   const [products, setProducts] = useState<Product[]>([])
   const [page, setPage] = useState<ShopPageData | null>(null)
+  const [contact, setContact] = useState<SiteContact | null>(null)
+  const [origin, setOrigin] = useState('')
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/get-products`)
@@ -260,6 +307,11 @@ export default function ShopPage() {
       .then(r => r.json())
       .then(d => setPage(d.page ?? null))
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetchSiteSettings().then((s) => setContact(s.contact ?? null)).catch(() => {})
+    if (typeof window !== 'undefined') setOrigin(window.location.origin)
   }, [])
 
   const hero        = page?.hero
@@ -369,7 +421,7 @@ export default function ShopPage() {
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 22 }}>
             {filtered.map((p, i) => (
-              <ProductCard key={p.slug} p={p} i={i} />
+              <ProductCard key={p.slug} p={p} i={i} contact={contact} origin={origin} />
             ))}
           </div>
           {filtered.length === 0 && empty?.visible !== false && (

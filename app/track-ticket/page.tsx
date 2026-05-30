@@ -6,11 +6,39 @@ import InnerHero from '@/components/InnerHero'
 import FooterCTA from '@/components/FooterCTA'
 
 type TicketStep = { label: string; desc: string; time: string; done: boolean; active: boolean }
+type ApiTicketStep = {
+  label?: string;
+  desc?: string;
+  description?: string;
+  time?: string;
+  timestamp?: string;
+  occurredAt?: string;
+  done?: boolean;
+  active?: boolean;
+}
 type ApiTicket = {
-  id?: string; ticketId?: string; issue?: string; issueDescription?: string;
+  id?: string; ticketId?: string;
+  issue?: string; issueDescription?: string; description?: string; issueType?: string;
   created?: string; createdAt?: string; eta?: string;
   status?: string; minerModel?: string; customerName?: string;
-  steps?: { label?: string; description?: string; timestamp?: string; done?: boolean }[]
+  steps?: ApiTicketStep[]
+}
+
+const formatStepTime = (s: ApiTicketStep): string => {
+  const explicit = s.time ?? s.timestamp
+  if (explicit && explicit.trim()) return explicit
+  if (s.occurredAt) {
+    const d = new Date(s.occurredAt)
+    if (!isNaN(d.getTime())) return d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+  }
+  return '—'
+}
+
+const formatEta = (eta?: string): string => {
+  if (!eta) return '—'
+  const d = new Date(eta)
+  if (isNaN(d.getTime())) return eta
+  return d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 type TrackData = {
@@ -49,17 +77,19 @@ function Timeline({ steps }: { steps: TicketStep[] }) {
             )}
           </div>
           <div style={{
-            background: step.active ? 'var(--navy-900)' : step.done ? 'var(--cream)' : 'rgba(10,22,40,0.03)',
-            border: step.active ? '1px solid var(--navy-900)' : '1px solid rgba(10,22,40,0.08)',
+            background: step.active ? 'var(--navy-900)' : step.done ? 'var(--cream)' : 'rgba(10,22,40,0.04)',
+            border: step.active ? '1px solid var(--navy-900)' : '1px solid rgba(10,22,40,0.1)',
             borderRadius: 'var(--radius)',
             padding: '16px 20px',
-            color: step.active ? 'var(--cream)' : step.done ? 'var(--ink)' : 'var(--navy-300)',
+            color: step.active ? 'var(--cream)' : 'var(--ink)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>{step.label}</span>
-              <span className="mono" style={{ fontSize: 10, color: step.active ? 'var(--mint-300)' : 'var(--navy-300)' }}>{step.time}</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14, color: step.active ? 'var(--cream)' : 'var(--ink)' }}>{step.label}</span>
+              <span className="mono" style={{ fontSize: 10, color: step.active ? 'var(--mint-300)' : 'var(--navy-500)' }}>{step.time}</span>
             </div>
-            <p style={{ fontSize: 13, lineHeight: 1.65, color: step.active ? 'rgba(251,251,243,0.65)' : step.done ? 'var(--navy-500)' : 'rgba(10,22,40,0.3)' }}>{step.desc}</p>
+            {step.desc && (
+              <p style={{ fontSize: 13, lineHeight: 1.65, color: step.active ? 'rgba(251,251,243,0.85)' : 'var(--navy-700)' }}>{step.desc}</p>
+            )}
           </div>
         </div>
       ))}
@@ -189,16 +219,17 @@ export default function TrackTicketPage() {
 
           {ticket && (() => {
             const displayId = ticket.ticketId ?? ticket.id ?? ticketId
-            const displayIssue = ticket.issueDescription ?? ticket.issue ?? ''
+            const displayIssue = ticket.description ?? ticket.issueDescription ?? ticket.issue ?? ticket.issueType ?? ''
             const displayCreated = ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : (ticket.created ?? '—')
-            const displayEta = ticket.eta ?? '—'
+            const displayEta = formatEta(ticket.eta)
             const rawSteps = ticket.steps ?? []
+            const firstUndoneIdx = rawSteps.findIndex(s => !s.done)
             const steps: TicketStep[] = rawSteps.map((s, i) => ({
               label: s.label ?? `Step ${i + 1}`,
-              desc: s.description ?? '',
-              time: s.timestamp ? new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—',
+              desc: s.desc ?? s.description ?? '',
+              time: formatStepTime(s),
               done: s.done ?? false,
-              active: !s.done && rawSteps.slice(i + 1).some(ns => !ns.done) === false && i === rawSteps.findIndex(ns => !ns.done),
+              active: !s.done && i === firstUndoneIdx,
             }))
             return (
               <div style={{ animation: 'fadeSlideUp 0.5s cubic-bezier(.2,.8,.2,1) forwards' }}>
