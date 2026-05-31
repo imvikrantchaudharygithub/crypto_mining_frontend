@@ -77,15 +77,7 @@ export default function Navbar({
       >
         {/* Logo */}
         <Link href={logoHref} style={{ display: 'flex', alignItems: 'center', gap: 11, textDecoration: 'none' }}>
-          <span style={{
-            display: 'grid', placeItems: 'center',
-            width: 40, height: 40, borderRadius: 10,
-            background: 'var(--mint-400)',
-            border: '1px solid var(--mint-300)',
-            flexShrink: 0,
-          }}>
-            <LogoMark size={28} tone="var(--navy-900)" />
-          </span>
+          <LogoMark size={28} tone="light" />
           <span style={{ lineHeight: 1.1, display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--mint-300)', letterSpacing: '-0.01em' }}>
               Crypto Mining Miles

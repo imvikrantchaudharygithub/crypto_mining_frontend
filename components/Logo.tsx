@@ -1,62 +1,56 @@
 import React from 'react'
+import Image from 'next/image'
 
 /* ────────────────────────────────────────────────────────────
-   ICON MARK — pickaxe + 4 coins.
-   Standalone, scalable, viewBox 0 0 100 80.
-   `tone` controls stroke color; default navy.
+   ICON MARK — pickaxe + 4 coins, rendered from transparent PNG.
+   No chip background; the artwork floats freely on any surface.
+
+   The PNG is cropped tight to the actual artwork (aspect 2.17:1) and
+   has a fully transparent background. Two variants:
+     • /cmmlogo.png        — navy ink for light surfaces (default)
+     • /cmmlogo-light.png  — mint ink for dark surfaces (tone="light")
+
+   `size` is treated as the HEIGHT; width auto-scales by aspect ratio.
    ──────────────────────────────────────────────────────────── */
+const LOGO_ASPECT = 892 / 412 // 2.17:1 — derived from the cropped artwork
+
 export function LogoMark({
-  size = 36,
-  tone = 'var(--navy-900)',
+  size = 28,
+  tone,
   className,
   style,
 }: {
   size?: number
+  /** Pass "light" (or any mint/cream token) when sitting on a dark surface. */
   tone?: string
   className?: string
   style?: React.CSSProperties
 }) {
-  return (
-    <svg
-      width={size}
-      height={size * 0.8}
-      viewBox="0 0 100 80"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      style={style}
-      role="img"
-      aria-label="Crypto Mining Miles icon"
-    >
-      {/* PICKAXE — left side */}
-      <g stroke={tone} strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" fill="none">
-        {/* Pick head (curved double-edge) */}
-        <path d="M 8 22 Q 22 6 42 18" />
-        {/* Pick collar (vertical band over the head's center) */}
-        <path d="M 22 8 L 22 22" />
-        <path d="M 30 12 L 30 26" />
-        {/* Handle */}
-        <path d="M 26 18 L 38 56" />
-        {/* Handle grip (small notches near bottom) */}
-        <path d="M 32 44 L 36 42" />
-        <path d="M 35 52 L 39 50" />
-      </g>
+  const isLight =
+    tone === 'light' ||
+    tone === 'var(--mint-300)' ||
+    tone === 'var(--mint-400)' ||
+    tone === 'var(--cream)'
+  const src = isLight ? '/cmmlogo-light.png' : '/cmmlogo.png'
+  const w = Math.round(size * LOGO_ASPECT)
 
-      {/* 4 COINS — right side, 2×2 grid */}
-      <g stroke={tone} strokeWidth={2.6} fill="none">
-        {/* Top row */}
-        <circle cx={62} cy={16} r={7} />
-        <circle cx={80} cy={16} r={7} />
-        {/* Bottom row */}
-        <circle cx={62} cy={34} r={7} />
-        <circle cx={80} cy={34} r={7} />
-        {/* Inner marks — stylized "M" notch */}
-        <path d="M 59 18 L 62 14 L 65 18" strokeWidth={2} />
-        <path d="M 77 18 L 80 14 L 83 18" strokeWidth={2} />
-        <path d="M 59 36 L 62 32 L 65 36" strokeWidth={2} />
-        <path d="M 77 36 L 80 32 L 83 36" strokeWidth={2} />
-      </g>
-    </svg>
+  return (
+    <Image
+      src={src}
+      alt="Crypto Mining Miles"
+      width={w}
+      height={size}
+      priority
+      sizes={`${w}px`}
+      className={className}
+      style={{
+        display: 'block',
+        height: size,
+        width: w,
+        flexShrink: 0,
+        ...style,
+      }}
+    />
   )
 }
 

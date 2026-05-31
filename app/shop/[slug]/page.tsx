@@ -906,7 +906,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           {/* Left column: all sections */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(60px,8vw,100px)' }}>
             <SpecsTable p={p} />
-            <ProfitCalculator p={p} />
+            {/* <ProfitCalculator p={p} /> */}
             <InTheBox p={p} />
             <Electrical p={p} contact={contact} />
             <FAQ />
