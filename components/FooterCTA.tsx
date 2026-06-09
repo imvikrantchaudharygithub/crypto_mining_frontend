@@ -46,7 +46,7 @@ export default function FooterCTA({ data }: { data?: FooterCTAData }) {
   const ctaLabel       = data?.cta?.label     ?? 'Open my contract →'
   const ctaHref        = data?.cta?.href      ?? '#plans'
   const links          = data?.quickLinks && data.quickLinks.length > 0 ? data.quickLinks : DEFAULT_LINKS
-  const copyright      = data?.copyright      ?? '© 2026 Crypto Mining Miles · redefined mining · est 2017'
+  const copyright      = data?.copyright      ?? '© 2026 Crypto Mining India · Crypto Mining Miles (CMM) · est 2017'
   const coordinates    = data?.coordinates    ?? 'N 28°37′12″ · E 77°13′08″ · New Delhi facility'
 
   return (
