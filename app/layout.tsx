@@ -53,10 +53,19 @@ export const metadata: Metadata = {
     'scrypt miner',
     'cryptominingmiles',
     'cryptominingindia',
+    // Brand variants (cmmmining.in → 301)
     'crypto mining miles',
     'cmm mining',
     'cmm crypto mining',
     'crypto mining miles india',
+    // Geo + brand-variant intent (cryptominerdelhi.com, cryptominerindias.com → 301)
+    'crypto miner delhi',
+    'asic miner delhi',
+    'bitcoin miner delhi',
+    'antminer delhi',
+    'buy crypto miner in delhi',
+    'crypto miner india',
+    'cryptominer india',
   ],
   authors: [{ name: SITE_NAME, url: SITE_URL }],
   creator: SITE_NAME,
@@ -116,7 +125,7 @@ const organizationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: SITE_NAME,
-  alternateName: ['Crypto Mining Miles', 'CMM', 'CMM Mining'],
+  alternateName: ['Crypto Mining Miles', 'CMM', 'CMM Mining', 'Crypto Miner India', 'Crypto Miner Delhi'],
   url: SITE_URL,
   logo: `${SITE_URL}/cmmlogo.png`,
   description: SITE_TAGLINE,
@@ -152,6 +161,34 @@ const websiteJsonLd = {
   },
 }
 
+// Local SEO — wins "crypto miner delhi / asic miner near me in delhi" intent
+// and Google Maps / local-pack surfacing. Street address, geo coords and
+// opening hours should be filled in once finalised (kept minimal, never faked).
+const localBusinessJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Store',
+  '@id': `${SITE_URL}/#store`,
+  name: SITE_NAME,
+  alternateName: ['Crypto Miner Delhi', 'CMM Mining'],
+  image: `${SITE_URL}/og-image.png`,
+  logo: `${SITE_URL}/cmmlogo.png`,
+  url: SITE_URL,
+  telephone: '+91-99119-44472',
+  priceRange: '₹₹₹',
+  description: SITE_TAGLINE,
+  address: {
+    '@type': 'PostalAddress',
+    addressLocality: 'New Delhi',
+    addressRegion: 'Delhi',
+    addressCountry: 'IN',
+  },
+  areaServed: [
+    { '@type': 'City', name: 'New Delhi' },
+    { '@type': 'Country', name: 'India' },
+  ],
+  sameAs: ['https://wa.me/919911944472'],
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable} ${jetBrainsMono.variable}`}>
@@ -163,6 +200,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
         />
       </head>
       <body>

@@ -53,6 +53,75 @@ type ShopPageData = {
   trust?: { visible?: boolean; items?: { icon: string; label: string; desc: string }[] }
 }
 
+/* ────────────────────────────────────────────────────────────
+   Skeleton loader — mirrors the real ProductCard layout so the
+   page doesn't jump when real data arrives.
+   ──────────────────────────────────────────────────────────── */
+function ProductCardSkeleton({ i }: { i: number }) {
+  const block = (style?: React.CSSProperties): React.CSSProperties => ({
+    background: 'rgba(10,22,40,0.08)',
+    borderRadius: 8,
+    ...style,
+  })
+
+  return (
+    <div
+      className="product-skeleton"
+      data-testid="product-card-skeleton"
+      aria-hidden="true"
+      style={{
+        borderRadius: 'var(--radius-lg)',
+        padding: 28,
+        background: 'var(--cream)',
+        border: '1px solid rgba(10,22,40,0.08)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 18,
+        position: 'relative',
+        overflow: 'hidden',
+        animationDelay: `${(i % 6) * 90}ms`,
+      }}
+    >
+      {/* Top row — tag chip + stock dot */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 22 }}>
+        <div style={block({ width: 78, height: 18, borderRadius: 999 })} />
+        <div style={block({ width: 56, height: 12, borderRadius: 999 })} />
+      </div>
+
+      {/* Algo */}
+      <div style={block({ width: 64, height: 11 })} />
+
+      {/* Product name (h3) */}
+      <div style={block({ width: '70%', height: 22, marginTop: -6 })} />
+
+      {/* Hashrate (big number) */}
+      <div style={block({ width: 168, height: 44 })} />
+
+      {/* 4 spec blocks (2x2) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px', paddingTop: 14, borderTop: '1px dashed rgba(10,22,40,0.10)' }}>
+        {Array.from({ length: 4 }).map((_, k) => (
+          <div key={k}>
+            <div style={block({ width: 44, height: 9, marginBottom: 6 })} />
+            <div style={block({ width: 72, height: 13 })} />
+          </div>
+        ))}
+      </div>
+
+      {/* Price row */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, paddingTop: 14, borderTop: '1px solid rgba(10,22,40,0.08)' }}>
+        <div style={block({ width: 110, height: 24 })} />
+        <div style={block({ width: 36, height: 10, marginLeft: 'auto' })} />
+      </div>
+
+      {/* Buttons */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
+        <div style={block({ flex: 1, height: 38, borderRadius: 999 })} />
+        <div style={block({ width: 72, height: 38, borderRadius: 999 })} />
+      </div>
+    </div>
+  )
+}
+
 function ProductCard({ p, i, contact, origin }: { p: Product; i: number; contact: SiteContact | null; origin: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -291,15 +360,19 @@ function ProductCard({ p, i, contact, origin }: { p: Product; i: number; contact
 export default function ShopPage() {
   const [activeFilter, setActiveFilter] = useState('All')
   const [products, setProducts] = useState<Product[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
   const [page, setPage] = useState<ShopPageData | null>(null)
   const [contact, setContact] = useState<SiteContact | null>(null)
   const [origin, setOrigin] = useState('')
 
   useEffect(() => {
+    let cancelled = false
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/get-products`)
       .then(r => r.json())
-      .then(d => setProducts(d.products ?? []))
-      .catch(() => {})
+      .then(d => { if (!cancelled) setProducts(d.products ?? []) })
+      .catch(() => { /* leave products empty — empty state shows after loading completes */ })
+      .finally(() => { if (!cancelled) setProductsLoading(false) })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -327,6 +400,18 @@ export default function ShopPage() {
   return (
     <main>
       <style>{`
+        /* Skeleton loader — gentle shimmer pulse */
+        .product-skeleton {
+          animation: skeletonPulse 1.4s ease-in-out infinite;
+        }
+        @keyframes skeletonPulse {
+          0%, 100% { opacity: 1; }
+          50%      { opacity: 0.55; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .product-skeleton { animation: none; opacity: 0.85; }
+        }
+
         /* Best-seller card — animated mint-on-navy gradient with halo pulse */
         .mag-card.is-bestseller {
           background-color: #0A1628;
@@ -420,11 +505,15 @@ export default function ShopPage() {
       <section style={{ padding: 'clamp(48px,6vw,80px) clamp(24px,5vw,80px)', background: 'var(--cream-2)' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 22 }}>
-            {filtered.map((p, i) => (
-              <ProductCard key={p.slug} p={p} i={i} contact={contact} origin={origin} />
-            ))}
+            {productsLoading
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <ProductCardSkeleton key={`skeleton-${i}`} i={i} />
+                ))
+              : filtered.map((p, i) => (
+                  <ProductCard key={p.slug} p={p} i={i} contact={contact} origin={origin} />
+                ))}
           </div>
-          {filtered.length === 0 && empty?.visible !== false && (
+          {!productsLoading && filtered.length === 0 && empty?.visible !== false && (
             <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--navy-300)' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, marginBottom: 12 }}>
                 {empty?.title ?? 'No miners in this category yet.'}
