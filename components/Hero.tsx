@@ -1,8 +1,11 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import HeroParticles from './HeroParticles'
-import HeroMiner from './HeroMiner'
+import dynamic from 'next/dynamic'
+
+// Lazy-load heavy animation client-side only — keeps initial JS / LCP / INP low.
+const HeroParticles = dynamic(() => import('./HeroParticles'), { ssr: false })
+const HeroMiner = dynamic(() => import('./HeroMiner'), { ssr: false })
 
 type CTA = { label?: string; href?: string }
 type TrustItem = { value?: string; label?: string }

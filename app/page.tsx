@@ -9,6 +9,8 @@ import Team from '@/components/Team'
 import SoftwarePartners from '@/components/SoftwarePartners'
 import FAQ from '@/components/FAQ'
 import FooterCTA from '@/components/FooterCTA'
+import { HARDWARE_FAQS } from '@/lib/faqData'
+import { faqPageSchema } from '@/lib/schema'
 
 export default async function Page() {
   const data = await fetchApi<{ success: boolean; homePage: any; navLinks: any[]; team: any[]; softwarePartners: any[] }>(
@@ -16,9 +18,14 @@ export default async function Page() {
   ).catch(() => null)
 
   const hp = data?.homePage ?? {}
+  const faqItems = hp.faqs?.items?.length ? hp.faqs.items : HARDWARE_FAQS
 
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqPageSchema(faqItems)) }}
+      />
       <Navbar navLinks={data?.navLinks ?? []} />
       <Hero hero={hp.hero ?? null} />
       <StatsMarquee data={hp.statsMarquee ?? null} />

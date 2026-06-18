@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next'
+import { allGuideSlugs } from '@/lib/guides'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://cryptominingindia.com'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.cryptominingindia.com/api'
@@ -34,6 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/warranty`,        lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${SITE_URL}/contact`,         lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${SITE_URL}/track-ticket`,    lastModified: now, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${SITE_URL}/learn`,           lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
   ]
 
   const products = await fetchProductSlugs()
@@ -44,5 +46,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }))
 
-  return [...staticRoutes, ...productRoutes]
+  const guideRoutes: MetadataRoute.Sitemap = allGuideSlugs().map((slug) => ({
+    url: `${SITE_URL}/learn/${slug}`,
+    lastModified: now,
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }))
+
+  return [...staticRoutes, ...productRoutes, ...guideRoutes]
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import type { Product } from '@/lib/products'
+import { productImages, offerExtras, faqPageSchema, productFaqs } from '@/lib/schema'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://cryptominingindia.com'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.cryptominingindia.com/api'
@@ -27,8 +28,11 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 
   const url = `${SITE_URL}/shop/${p.slug}`
-  const title = `${p.name} — ${p.hashrate} ${p.algo} ASIC Miner · Buy in India`
-  const description = `Buy ${p.name} in India · ${p.hashrate} hashrate · ${p.power} · ${p.efficiency} efficiency · ₹${p.price?.toLocaleString('en-IN')} all-in · 12-month warranty · pan-India shipping · WhatsApp/call support. ${p.tagline ?? ''}`.slice(0, 300)
+  const baseTitle = `${p.name} — ${p.hashrate} ${p.algo} ASIC Miner · Buy in India`
+  const baseDescription = `Buy ${p.name} in India · ${p.hashrate} hashrate · ${p.power} · ${p.efficiency} efficiency · ₹${p.price?.toLocaleString('en-IN')} all-in · 12-month warranty · pan-India shipping · WhatsApp/call support. ${p.tagline ?? ''}`.slice(0, 300)
+  const seo = (p as any).seo ?? {}
+  const title = seo.title || baseTitle
+  const description = seo.description || baseDescription
   const stock = (p as any).computedStatus ?? (p.available ? 'In Stock' : 'Coming Soon')
 
   return {
@@ -74,7 +78,7 @@ export default async function ProductLayout({ params, children }: Props) {
     name: p.name,
     sku: p.sku,
     description: p.tagline,
-    image: [`${SITE_URL}/cmmlogo.png`],
+    image: productImages((p as any).images, `${SITE_URL}/cmmlogo.png`),
     brand: { '@type': 'Brand', name: 'Crypto Mining India' },
     category: `${p.algo} ASIC Miner`,
     offers: {
@@ -91,6 +95,7 @@ export default async function ProductLayout({ params, children }: Props) {
       itemCondition: 'https://schema.org/NewCondition',
       seller: { '@type': 'Organization', name: 'Crypto Mining India' },
       areaServed: 'IN',
+      ...offerExtras(SITE_URL),
     },
     additionalProperty: [
       { '@type': 'PropertyValue', name: 'Hashrate', value: p.hashrate },
@@ -112,12 +117,17 @@ export default async function ProductLayout({ params, children }: Props) {
     ],
   }
 
+  const productFaqSchema = p ? faqPageSchema(productFaqs(p)) : null
+
   return (
     <>
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      {productFaqSchema && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productFaqSchema) }} />
+      )}
       {children}
     </>
   )

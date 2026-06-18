@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { HARDWARE_FAQS } from '@/lib/faqData'
 
 type FAQData = {
   visible?: boolean
@@ -9,15 +10,6 @@ type FAQData = {
   headlineLine2?: string
   items?: { q: string; a: string }[]
 } | null
-
-const DEFAULT_FAQS = [
-  { q: 'How is this different from cloud mining scams?', a: 'Most "cloud mining" is a paper claim with no hardware behind it. We own the rigs, publish facility audits, and let you trace your contract to specific machines.' },
-  { q: 'When do I get paid, and to where?',              a: 'Every 24 hours, automatically, to the wallet address you provide at signup. We never custody your funds. All payouts are on-chain and verifiable.' },
-  { q: 'What happens after my contract ends?',           a: 'You can renew at the current rate, upgrade to a larger plan, or simply walk away. There is no auto-renewal or lock-in.' },
-  { q: 'Is there a minimum payout?',                     a: '0.0001 BTC. Below that, payouts roll over to the next day to avoid network fees eating your earnings.' },
-  { q: 'What if Bitcoin price crashes?',                 a: "Your hashrate keeps producing the same BTC regardless of price. We don't hedge for you — that's your call. We do publish a break-even calculator." },
-  { q: 'Do you offer an institutional desk?',            a: 'Yes. The Mountain plan is the entry point; for $250k+ commitments, we offer custom contracts, dedicated AMs, and direct facility tours.' },
-]
 
 export default function FAQ({ data }: { data?: FAQData }) {
   const [open, setOpen] = useState<number | null>(0)
@@ -39,7 +31,7 @@ export default function FAQ({ data }: { data?: FAQData }) {
   const sectionTag    = data?.sectionTag    ?? '06 / questions'
   const headlineLine1 = data?.headlineLine1 ?? 'The honest'
   const headlineLine2 = data?.headlineLine2 ?? 'answers.'
-  const FAQS = data?.items && data.items.length > 0 ? data.items : DEFAULT_FAQS
+  const FAQS = data?.items && data.items.length > 0 ? data.items : HARDWARE_FAQS
 
   return (
     <section
