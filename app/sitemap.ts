@@ -23,6 +23,20 @@ async function fetchProductSlugs(): Promise<ProductSlug[]> {
   }
 }
 
+async function fetchBlogSlugs(): Promise<ProductSlug[]> {
+  try {
+    const res = await fetch(`${API_URL}/get-blogs`, { next: { revalidate: 3600 } })
+    if (!res.ok) return []
+    const data = await res.json()
+    const posts = (data?.posts ?? []) as Array<{ slug?: string; updatedAt?: string }>
+    return posts
+      .filter((p) => p.slug)
+      .map((p) => ({ slug: p.slug!, updatedAt: p.updatedAt }))
+  } catch {
+    return []
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
 
@@ -36,6 +50,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/contact`,         lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${SITE_URL}/track-ticket`,    lastModified: now, changeFrequency: 'monthly', priority: 0.4 },
     { url: `${SITE_URL}/learn`,           lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
+    { url: `${SITE_URL}/blog`,            lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
   ]
 
   const products = await fetchProductSlugs()
@@ -53,5 +68,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }))
 
-  return [...staticRoutes, ...productRoutes, ...guideRoutes]
+  const blogs = await fetchBlogSlugs()
+  const blogRoutes: MetadataRoute.Sitemap = blogs.map((p) => ({
+    url: `${SITE_URL}/blog/${p.slug}`,
+    lastModified: p.updatedAt ? new Date(p.updatedAt) : now,
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }))
+
+  return [...staticRoutes, ...productRoutes, ...guideRoutes, ...blogRoutes]
 }

@@ -11,6 +11,7 @@ const DEFAULT_NAV_LINKS = [
   { label: 'Profitability', href: '/profitability' },
   { label: 'Service',       href: '/service-request' },
   { label: 'Warranty',      href: '/warranty' },
+  { label: 'Blog',          href: '/blog' },
   { label: 'Track Ticket',  href: '/track-ticket' },
   { label: 'Contact',       href: '/contact' },
 ]

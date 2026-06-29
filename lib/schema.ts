@@ -71,6 +71,30 @@ export function articleSchema(siteUrl: string, g: { slug: string; title: string;
   }
 }
 
+export function blogPostSchema(siteUrl: string, post: {
+  slug: string; title: string; excerpt: string; coverImage?: string;
+  author?: string; publishedAt?: string; updatedAt?: string;
+}) {
+  const url = `${siteUrl}/blog/${post.slug}`
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.excerpt,
+    image: post.coverImage ? [post.coverImage] : undefined,
+    author: { '@type': 'Organization', name: post.author || 'Crypto Mining India' },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Crypto Mining India',
+      logo: { '@type': 'ImageObject', url: `${siteUrl}/cmmlogo.png` },
+    },
+    datePublished: post.publishedAt,
+    dateModified: post.updatedAt || post.publishedAt,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    url,
+  }
+}
+
 export function breadcrumbSchema(items: { name: string; item: string }[]) {
   return {
     '@context': 'https://schema.org',

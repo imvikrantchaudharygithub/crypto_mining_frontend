@@ -9,27 +9,14 @@ accounts). None require coding. Do them in order — the whole list is ~1 hour.
 
 ---
 
-## 1. Turn on Google Search Console verification (5 min) — DO FIRST
-Without this, Google gives you zero data and slower indexing.
+## 1. Google Search Console verification — ✅ ALREADY DONE
+The `cryptominingindia.com` **Domain** property is already verified via your
+**domain name provider (DNS)** — the strongest method (covers all subdomains + http/https).
 
-1. Go to https://search.google.com/search-console → add property → **Domain** → `cryptominingindia.com`.
-2. Pick the **HTML tag** method. Copy the token (the long string in `content="..."`).
-3. On your **DigitalOcean Droplet**, edit the production env file (`.env.local`) in the
-   frontend folder and set:
-   ```
-   NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=<paste-the-token>
-   ```
-   > ⚠️ Important: `NEXT_PUBLIC_*` variables are **baked in at build time**, not read
-   > at runtime. You must set the token *before* building, or it won't appear on the page.
-4. Rebuild and restart:
-   ```bash
-   cd crypto_mining_frontend
-   npm run build
-   pm2 restart <your-app-name>   # or: pm2 reload all
-   ```
-5. Confirm it's live: `curl -s https://cryptominingindia.com/ | grep google-site-verification`
-   (should print a meta tag with your token).
-6. Back in Search Console, click **Verify**.
+- There is no "HTML tag" option for a Domain property — that's normal; Domain
+  properties verify by DNS only. Nothing more to do here.
+- You can **leave `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` blank** in `.env.local` —
+  the meta tag is redundant now that DNS proves ownership. No rebuild needed for this.
 
 > **Standard deploy flow on your Droplet** (use this every time you ship the code I wrote):
 > `git pull` (or upload files) → `npm install` → `npm run build` → `pm2 restart <app>`.
@@ -37,7 +24,15 @@ Without this, Google gives you zero data and slower indexing.
 
 ## 2. Submit your sitemap (2 min)
 In Search Console → **Sitemaps** → enter `sitemap.xml` → Submit.
-(Full URL: `https://cryptominingindia.com/sitemap.xml` — now includes the 6 new `/learn` guides.)
+(Full URL: `https://cryptominingindia.com/sitemap.xml` — now includes the 6 `/learn` guides
+**and every published `/blog` post automatically**.)
+
+> **Blog → Google:** Once the sitemap above is submitted, you never touch it again
+> for the blog. Each post you publish in the admin appears in `sitemap.xml` within
+> ~1 hour (it revalidates hourly) and Google picks it up on its next crawl. New
+> posts also carry `BlogPosting` structured data + an RSS feed at
+> `https://cryptominingindia.com/blog/feed.xml`. To get a brand-new post crawled
+> faster, paste its URL into Search Console → **URL Inspection** → **Request indexing**.
 
 ## 3. Connect the redirect domains properly (10 min)
 You own `cmmmining.in`, `cryptominerdelhi.com`, `cryptominerindias.com` (301 → main site).
